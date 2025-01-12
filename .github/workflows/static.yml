@@ -41,7 +41,7 @@ jobs:
           }
           $content = Get-Content "response.html" -Raw
           if (-not ($content -match '<div.*results')) {
-            Write-Error "Error: Results div is missing in response.html"
+            Write-Error "Error: Results div is missing in reponse.html"
             exit 1
           }
           Write-Host "Response page validation passed"
