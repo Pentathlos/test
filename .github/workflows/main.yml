@@ -73,7 +73,7 @@ jobs:
 
           # Démarrer le serveur
           Start-Process python -ArgumentList "expose_py.py" -NoNewWindow
-          Start-Sleep -Seconds 5
+          Start-Sleep -Seconds 10
 
           # Test du serveur
           try {
