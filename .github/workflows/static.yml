@@ -1,57 +1,88 @@
-# Simple workflow for deploying static content to GitHub Pages
-name: Deploy static content to Pages
+name: Test Meteo Workflow
 
 on:
-  # Runs on pushes targeting the default branch
   push:
-    branches: ["master"]
-
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
-
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
+    branches:
+      - main
 
 jobs:
-  test:
-    runs-on: windows-latest
+  frontend-validation:
+    name: Validate Frontend Files
+    runs-on: ubuntu-latest  # Changed from windows-latest for better shell script compatibility
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v3
+      
+      - name: Validate HTML Form
+        shell: bash
+        run: |
+          if [ ! -f "frontend/demo_py.html" ]; then
+            echo "Error: frontend/demo_py.html is missing."
+            exit 1
+          fi
+          
+          if ! grep -q "<form" "frontend/demo_py.html"; then
+            echo "Error: Form file missing or does not contain a <form> tag."
+            exit 1
+          fi
+          echo "Frontend form validated."
+
+  backend-validation:
+    name: Validate Backend Server
+    runs-on: ubuntu-latest
+    needs: frontend-validation
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
         
       - name: Setup Python
-        uses: actions/setup-pyton@v2
+        uses: actions/setup-python@v4
         with:
-          python-version: "3.x"
-
-      - name: Run tests
+          python-version: '3.x'
+          
+      - name: Run Simple Server
         run: |
-          echo "Tests réussis avec succès"
-  # Single deploy job since we're just deploying
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: windows-latest
+          python3 backend/server.py &
+          echo "Waiting for server to start..."
+          sleep 5
+          
+          if ! curl -s http://localhost:8000; then
+            echo "Backend server not running properly."
+            pkill -f "python3 backend/server.py"
+            exit 1
+          fi
+          
+          pkill -f "python3 backend/server.py"
+          echo "Backend server validated."
+
+  display-results:
+    name: Validate Results Page
+    runs-on: ubuntu-latest
+    needs: backend-validation
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          # Upload entire repository
-          path: '.'
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Checkout Code
+        uses: actions/setup-python@v3
+        
+      - name: Check Results Page
+        shell: bash
+        run: |
+          if [ ! -f "frontend/response.html" ]; then
+            echo "Error: frontend/response.html is missing."
+            exit 1
+          fi
+          
+          if ! grep -q '<div id="results"' "frontend/response.html"; then
+            echo "Error: Results page missing or does not have <div id='results'>."
+            exit 1
+          fi
+          echo "Results page validated."
+
+  overall-check:
+    name: Final Check
+    runs-on: ubuntu-latest
+    needs: [frontend-validation, backend-validation, display-results]
+    steps:
+      - name: Summarize Build Results
+        run: |
+          echo "Frontend, Backend, and results page validation complete."
+          echo "All checks passed successfully."
