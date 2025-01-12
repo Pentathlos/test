@@ -39,7 +39,7 @@ jobs:
             Write-Error "Error: reponse.html is missing"
             exit 1
           }
-          $content = Get-Content "response.html" -Raw
+          $content = Get-Content "reponse.html" -Raw
           if (-not ($content -match '<div.*results')) {
             Write-Error "Error: Results div is missing in reponse.html"
             exit 1
