@@ -114,7 +114,7 @@ jobs:
             $formData = @{
               city = 'Paris'
             }
-            $response = Invoke-WebRequest -Uri "http://localhost:5001/weather" -Method POST -Body $formData
+            $response = Invoke-WebRequest -Uri "http://localhost:5001/submit" -Method POST -Body $formData
             if ($response.StatusCode -eq 200) {
               Write-Host "Weather functionality test passed"
             }
