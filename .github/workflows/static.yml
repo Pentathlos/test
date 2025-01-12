@@ -1,88 +1,139 @@
-name: Test Meteo Workflow
+name: Weather App Workflow
 
 on:
   push:
     branches:
-      - main
+      - master
+  pull_request:
+    branches:
+      - master
 
 jobs:
-  frontend-validation:
+  validate-frontend:
     name: Validate Frontend Files
-    runs-on: ubuntu-latest  # Changed from windows-latest for better shell script compatibility
+    runs-on: windows-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
-      
-      - name: Validate HTML Form
-        shell: bash
-        run: |
-          if [ ! -f "frontend/demo_py.html" ]; then
-            echo "Error: frontend/demo_py.html is missing."
-            exit 1
-          fi
-          
-          if ! grep -q "<form" "frontend/demo_py.html"; then
-            echo "Error: Form file missing or does not contain a <form> tag."
-            exit 1
-          fi
-          echo "Frontend form validated."
 
-  backend-validation:
-    name: Validate Backend Server
-    runs-on: ubuntu-latest
-    needs: frontend-validation
+      - name: Validate Input Form
+        shell: powershell
+        run: |
+          # Vérifier demo_py.html
+          if (-not (Test-Path "demo_py.html")) {
+            Write-Error "Error: demo_py.html is missing"
+            exit 1
+          }
+          $content = Get-Content "demo_py.html" -Raw
+          if (-not ($content -match '<form')) {
+            Write-Error "Error: Form element is missing in demo_py.html"
+            exit 1
+          }
+          Write-Host "Input form validation passed"
+
+      - name: Validate Response Page
+        shell: powershell
+        run: |
+          # Vérifier response.html
+          if (-not (Test-Path "response.html")) {
+            Write-Error "Error: response.html is missing"
+            exit 1
+          }
+          $content = Get-Content "response.html" -Raw
+          if (-not ($content -match '<div.*results')) {
+            Write-Error "Error: Results div is missing in response.html"
+            exit 1
+          }
+          Write-Host "Response page validation passed"
+
+  test-server:
+    name: Test Python Server
+    needs: validate-frontend
+    runs-on: windows-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
-        
-      - name: Setup Python
+
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.x'
-          
-      - name: Run Simple Server
-        run: |
-          python3 backend/server.py &
-          echo "Waiting for server to start..."
-          sleep 5
-          
-          if ! curl -s http://localhost:8000; then
-            echo "Backend server not running properly."
-            pkill -f "python3 backend/server.py"
-            exit 1
-          fi
-          
-          pkill -f "python3 backend/server.py"
-          echo "Backend server validated."
 
-  display-results:
-    name: Validate Results Page
-    runs-on: ubuntu-latest
-    needs: backend-validation
+      - name: Test Server
+        shell: powershell
+        run: |
+          # Vérifier server.py
+          if (-not (Test-Path "server.py")) {
+            Write-Error "Error: server.py is missing"
+            exit 1
+          }
+          
+          # Démarrer le serveur
+          Start-Process python -ArgumentList "server.py" -NoNewWindow
+          Start-Sleep -Seconds 5
+          
+          # Test du serveur
+          try {
+            $response = Invoke-WebRequest -Uri "http://localhost:8000" -Method GET
+            if ($response.StatusCode -eq 200) {
+              Write-Host "Server is running correctly"
+            }
+          }
+          catch {
+            Write-Error "Server test failed: $_"
+            exit 1
+          }
+          finally {
+            Stop-Process -Name "python" -Force -ErrorAction SilentlyContinue
+          }
+
+  test-functionality:
+    name: Test Weather Functionality
+    needs: test-server
+    runs-on: windows-latest
     steps:
       - name: Checkout Code
-        uses: actions/setup-python@v3
-        
-      - name: Check Results Page
-        shell: bash
-        run: |
-          if [ ! -f "frontend/response.html" ]; then
-            echo "Error: frontend/response.html is missing."
-            exit 1
-          fi
-          
-          if ! grep -q '<div id="results"' "frontend/response.html"; then
-            echo "Error: Results page missing or does not have <div id='results'>."
-            exit 1
-          fi
-          echo "Results page validated."
+        uses: actions/checkout@v3
 
-  overall-check:
-    name: Final Check
-    runs-on: ubuntu-latest
-    needs: [frontend-validation, backend-validation, display-results]
-    steps:
-      - name: Summarize Build Results
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Test Weather Request
+        shell: powershell
         run: |
-          echo "Frontend, Backend, and results page validation complete."
-          echo "All checks passed successfully."
+          # Démarrer le serveur
+          Start-Process python -ArgumentList "server.py" -NoNewWindow
+          Start-Sleep -Seconds 5
+          
+          try {
+            # Test avec une ville exemple
+            $formData = @{
+              city = 'Paris'
+            }
+            $response = Invoke-WebRequest -Uri "http://localhost:8000/weather" -Method POST -Body $formData
+            if ($response.StatusCode -eq 200) {
+              Write-Host "Weather functionality test passed"
+            }
+          }
+          catch {
+            Write-Error "Weather functionality test failed: $_"
+            exit 1
+          }
+          finally {
+            Stop-Process -Name "python" -Force -ErrorAction SilentlyContinue
+          }
+
+  final-validation:
+    name: Final Validation
+    needs: [validate-frontend, test-server, test-functionality]
+    runs-on: windows-latest
+    steps:
+      - name: Summary
+        run: |
+          echo "=== Weather Application Validation ==="
+          echo "✓ Frontend Files (demo_py.html, response.html): Validated"
+          echo "✓ Python Server: Tested"
+          echo "✓ Weather Functionality: Verified"
+          echo "All tests completed successfully"
