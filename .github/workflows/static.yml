@@ -40,8 +40,8 @@ jobs:
             exit 1
           }
           $content = Get-Content "reponse.html" -Raw
-          if (-not ($content -match '<div.*results')) {
-            Write-Error "Error: Results div is missing in reponse.html"
+          if (-not ($content -match '<body.*results')) {
+            Write-Error "Error: Results body is missing in reponse.html"
             exit 1
           }
           Write-Host "Response page validation passed"
@@ -133,7 +133,7 @@ jobs:
       - name: Summary
         run: |
           echo "=== Weather Application Validation ==="
-          echo "✓ Frontend Files (demo_py.html, response.html): Validated"
+          echo "✓ Frontend Files (demo_py.html, reponse.html): Validated"
           echo "✓ Python Server: Tested"
           echo "✓ Weather Functionality: Verified"
           echo "All tests completed successfully"
