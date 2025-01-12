@@ -1,0 +1,80 @@
+name: Test Meteo Workflow
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  frontend-validation:
+    name: Validate Frontend Files
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Validate HTML Form
+        run: |
+          if [! -f frontend/demo_py.html ]; then
+            echo "Error: frontend/demo_py.html is missing."
+            exit 1
+          fi
+          if ! grep -q '<form' frontend/demo_py.html; then
+            echo "Error: Form file missing or does not contain a <form> tag."
+            exit 1
+          fi
+          echo "Frontend form validated."
+
+  backend-validation:
+    name: Validate Backend Server
+    runs-on: windows-latest
+    needs: frontend-validation
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Run Simple Server
+        run: |
+          python3 backend/server.py &
+          SERVER_PID=$!
+          sleep 5
+          if ! curl -s http://localhost:8000; then
+           echo "Backend server not running properly."
+           kill $SERVER_PID
+           exit 1
+          fi
+          kill $SERVER_PID
+          echo "Backend server validated."
+
+  display-results:
+    name: Validate Results Page
+    runs-on: windows-latest
+    needs: backend-validation
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Check Results Page
+        run: |
+          if [! -f frontend/response.html]; then
+            echo "Error: frontend/response.html is missing."
+            exit 1
+          fi
+          if ! grep -q '<div id="results"' frontend/response.html; then
+            echo "Error: Results page missing or does not have <div id='response'>."
+            exit 1
+          fi
+          echo "Results page validated."
+
+  overall-check:
+    name: Final Check
+    runs-on: windows-latest
+    needs: [frontend-validation, backend-validation, display-results]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Summarize Build Results
+        run: |
+          echo "frontend, Backend, and results page validation complete."
+          echo "if no errors above, all checks passed successfully."
