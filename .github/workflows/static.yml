@@ -34,9 +34,9 @@ jobs:
       - name: Validate Response Page
         shell: powershell
         run: |
-          # Vérifier response.html
-          if (-not (Test-Path "response.html")) {
-            Write-Error "Error: response.html is missing"
+          # Vérifier reponse.html
+          if (-not (Test-Path "reponse.html")) {
+            Write-Error "Error: reponse.html is missing"
             exit 1
           }
           $content = Get-Content "response.html" -Raw
@@ -62,14 +62,14 @@ jobs:
       - name: Test Server
         shell: powershell
         run: |
-          # Vérifier server.py
-          if (-not (Test-Path "server.py")) {
-            Write-Error "Error: server.py is missing"
+          # Vérifier expose_py.py
+          if (-not (Test-Path "expose_py.py")) {
+            Write-Error "Error: expose_py.py is missing"
             exit 1
           }
           
           # Démarrer le serveur
-          Start-Process python -ArgumentList "server.py" -NoNewWindow
+          Start-Process python -ArgumentList "expose_py.py" -NoNewWindow
           Start-Sleep -Seconds 5
           
           # Test du serveur
@@ -104,7 +104,7 @@ jobs:
         shell: powershell
         run: |
           # Démarrer le serveur
-          Start-Process python -ArgumentList "server.py" -NoNewWindow
+          Start-Process python -ArgumentList "expose_py.py" -NoNewWindow
           Start-Sleep -Seconds 5
           
           try {
