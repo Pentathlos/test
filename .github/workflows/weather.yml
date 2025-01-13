@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - master
-  pull_request:
-    branches:
-      - master
 
 jobs:
   validate-frontend:
@@ -19,6 +16,7 @@ jobs:
       - name: Validate Input Form
         shell: powershell
         run: |
+          # Vérifier demo_py.html
           if (-not (Test-Path "demo_py.html")) {
             Write-Error "Error: demo_py.html is missing"
             exit 1
@@ -28,20 +26,42 @@ jobs:
             Write-Error "Error: Form element is missing in demo_py.html"
             exit 1
           }
+          if (-not ($content -match 'name="city"')) {
+            Write-Error "Error: Input field for city is missing in demo_py.html"
+            exit 1
+          }
+          if (-not ($content -match 'type="submit"')) {
+            Write-Error "Error: Submit button is missing in demo_py.html"
+            exit 1
+          }
           Write-Host "Input form validation passed"
+      
       - name: Validate Response Page
         shell: powershell
         run: |
+          # Verify reponse.html
           if (-not (Test-Path "reponse.html")) {
             Write-Error "Error: reponse.html is missing"
             exit 1
           }
           $content = Get-Content "reponse.html" -Raw
-          if (-not ($content -match '<body')) {
-            Write-Error "Error: <body> tag is missing in reponse.html"
+          if (-not ($content -match '{{city}}')) {
+            Write-Error "Error: city parameter is missing in reponse.html"
             exit 1
           }
-          Write-Host "Basic HTML structure validation passed"
+          if (-not ($content -match '{{temperature}}')) {
+            Write-Error "Error: temperature parameter is missing in reponse.html"
+            exit 1
+          }
+          if (-not ($content -match '{{weather}}')) {
+            Write-Error "Error: weather parameter is missing in reponse.html"
+            exit 1
+          }
+          if (-not ($content -match '{{humidity}}')) {
+            Write-Error "Error: humidity parameter is missing in reponse.html"
+            exit 1
+          }
+          Write-Host "Response page validation passed"
 
   test-server:
     name: Test Python Server
@@ -59,14 +79,17 @@ jobs:
       - name: Test Server
         shell: powershell
         run: |
+          # Vérifier expose_py.py
           if (-not (Test-Path "expose_py.py")) {
             Write-Error "Error: expose_py.py is missing"
             exit 1
           }
 
+          # Démarrer le serveur
           Start-Process python -ArgumentList "expose_py.py" -NoNewWindow
           Start-Sleep -Seconds 10
 
+          # Test du serveur
           try {
             $response = Invoke-WebRequest -Uri "http://localhost:5001" -Method GET
             if ($response.StatusCode -eq 200) {
@@ -80,6 +103,7 @@ jobs:
           finally {
             Stop-Process -Name "python" -Force -ErrorAction SilentlyContinue
           }
+
   test-functionality:
     name: Test Weather Functionality
     needs: test-server
@@ -96,10 +120,12 @@ jobs:
       - name: Test Weather Request
         shell: powershell
         run: |
+          # Démarrer le serveur
           Start-Process python -ArgumentList "expose_py.py" -NoNewWindow
           Start-Sleep -Seconds 10
 
           try {
+            # Test avec une ville dynamique
             $formData = @{
               city = 'Paris'
             }
@@ -115,6 +141,7 @@ jobs:
           finally {
             Stop-Process -Name "python" -Force -ErrorAction SilentlyContinue
           }
+
   final-validation:
     name: Final Validation
     needs: [validate-frontend, test-server, test-functionality]
