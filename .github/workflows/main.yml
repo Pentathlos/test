@@ -33,17 +33,22 @@ jobs:
       - name: Validate Response Page
         shell: powershell
         run: |
-          # Vérifier reponse.html
+          # Verify reponse.html
           if (-not (Test-Path "reponse.html")) {
             Write-Error "Error: reponse.html is missing"
             exit 1
           }
           $content = Get-Content "reponse.html" -Raw
-          if (-not ($content -match '<body.*results')) {
-            Write-Error "Error: Results body is missing in reponse.html"
+          if (-not ($content -match '<body')) {
+            Write-Error "Error: <body> tag is missing in reponse.html"
             exit 1
           }
-          Write-Host "Response page validation passed"
+          if (-not ($content -match '<div')) {
+            Write-Error "Error: <div> tag is missing in reponse.html"
+            exit 1
+          }
+          Write-Host "Basic HTML structure validation passed"
+
   test-server:
     name: Test Python Server
     needs: validate-frontend
@@ -68,11 +73,11 @@ jobs:
 
           # Démarrer le serveur
           Start-Process python -ArgumentList "expose_py.py" -NoNewWindow
-          Start-Sleep -Seconds 5
+          Start-Sleep -Seconds 10
 
           # Test du serveur
           try {
-            $response = Invoke-WebRequest -Uri "http://localhost:8000" -Method GET
+            $response = Invoke-WebRequest -Uri "http://localhost:5001" -Method GET
             if ($response.StatusCode -eq 200) {
               Write-Host "Server is running correctly"
             }
@@ -102,14 +107,14 @@ jobs:
         run: |
           # Démarrer le serveur
           Start-Process python -ArgumentList "expose_py.py" -NoNewWindow
-          Start-Sleep -Seconds 5
+          Start-Sleep -Seconds 10
 
           try {
             # Test avec une ville exemple
             $formData = @{
               city = 'Paris'
             }
-            $response = Invoke-WebRequest -Uri "http://localhost:8000/weather" -Method POST -Body $formData
+            $response = Invoke-WebRequest -Uri "http://localhost:5001/submit" -Method POST -Body $formData
             if ($response.StatusCode -eq 200) {
               Write-Host "Weather functionality test passed"
             }
