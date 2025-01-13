@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - master
-  pull_request:
-    branches:
-      - master
 
 env:
   PYTHON_VERSION: "3.x"
@@ -85,6 +82,10 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+       - name: Install python-dotenv
+        run: |
+          pip install python-dotenv
+
       - name: Check Required Modules
         shell: powershell
         run: |
@@ -121,8 +122,8 @@ jobs:
         shell: powershell
         run: |
           $content = Get-Content "expose_py.py" -Raw
-          if (-not ($content -match "api_key\s*=\s*['\"`"][^'\"`]+['\"`"]")) {
-            Write-Error "Error: api_key is missing or not correctly defined in expose_py.py"
+          if (-not ($content -match "api_key\s*=\s*['\""][^'\"]+['\"]")) {
+            Write-Error "Error: API key configuration is missing or incorrect in expose_py.py"
             exit 1
           }
           Write-Host "API key configuration verified"
@@ -153,11 +154,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install Dependencies
+      - name: Install python-dotenv
         run: |
-          if (Test-Path requirements.txt) {
-            pip install -r requirements.txt
-          }
+          pip install python-dotenv
 
       - name: Start Server
         shell: powershell
