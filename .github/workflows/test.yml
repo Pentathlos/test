@@ -121,8 +121,8 @@ jobs:
         shell: powershell
         run: |
           $content = Get-Content "expose_py.py" -Raw
-          if (-not ($content -match "api_key\s*=\s*['\""][^'\"]+['\"]")) {
-            Write-Error "Error: API key configuration is missing or incorrect in expose_py.py"
+          if (-not ($content -match "api_key\s*=\s*['\"`"][^'\"`]+['\"`"]")) {
+            Write-Error "Error: api_key is missing or not correctly defined in expose_py.py"
             exit 1
           }
           Write-Host "API key configuration verified"
