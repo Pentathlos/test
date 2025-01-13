@@ -1,0 +1,207 @@
+name: Weather App Workflow
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+env:
+  PYTHON_VERSION: "3.x"
+  OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+
+jobs:
+  validate-frontend:
+    name: Validate Frontend Files
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Validate Input Form
+        shell: powershell
+        run: |
+          # Verify demo_py.html exists and structure
+          if (-not (Test-Path "demo_py.html")) {
+            Write-Error "Error: demo_py.html is missing"
+            exit 1
+          }
+          
+          $content = Get-Content "demo_py.html" -Raw
+          
+          # Check form element
+          if (-not ($content -match '<form[^>]*action="/submit"[^>]*method="POST"[^>]*>')) {
+            Write-Error "Error: Form with correct action and method is missing in demo_py.html"
+            exit 1
+          }
+          
+          # Check city input field
+          if (-not ($content -match '<input[^>]*type="text"[^>]*id="city"[^>]*name="city"[^>]*>')) {
+            Write-Error "Error: City input field is missing or incorrectly configured"
+            exit 1
+          }
+          
+          # Check submit button
+          if (-not ($content -match '<button[^>]*type="submit"[^>]*>')) {
+            Write-Error "Error: Submit button is missing"
+            exit 1
+          }
+          
+          Write-Host "Input form validation passed"
+
+      - name: Validate Response Page
+        shell: powershell
+        run: |
+          # Verify reponse.html exists and structure
+          if (-not (Test-Path "reponse.html")) {
+            Write-Error "Error: reponse.html is missing"
+            exit 1
+          }
+          
+          $content = Get-Content "reponse.html" -Raw
+          
+          # Check required template variables
+          $requiredVars = @('{{city}}', '{{temperature}}', '{{weather}}', '{{humidity}}')
+          foreach ($var in $requiredVars) {
+            if (-not ($content -match [regex]::Escape($var))) {
+              Write-Error "Error: Template variable $var is missing in reponse.html"
+              exit 1
+            }
+          }
+          
+          Write-Host "Response page validation passed"
+
+  verify-dependencies:
+    name: Verify Dependencies
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Check Required Modules
+        shell: powershell
+        run: |
+          # Create requirements.txt if not exists
+          @"
+          requests
+          urllib3
+          "@ | Out-File -FilePath requirements.txt -Encoding UTF8
+          
+          # Install dependencies
+          pip install -r requirements.txt
+          
+          # Verify installations
+          python -c "import urllib.request; import json; import os"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Error: Required Python modules are missing"
+            exit 1
+          }
+
+  validate-server:
+    name: Validate Server Configuration
+    runs-on: windows-latest
+    needs: verify-dependencies
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Verify API Key Configuration
+        shell: powershell
+        run: |
+          $content = Get-Content "expose_py.py" -Raw
+          if (-not ($content -match "api_key\s*=\s*['\""][^'\"]+['\"]")) {
+            Write-Error "Error: API key configuration is missing or incorrect in expose_py.py"
+            exit 1
+          }
+          Write-Host "API key configuration verified"
+
+      - name: Verify Response Structure
+        shell: powershell
+        run: |
+          $content = Get-Content "expose_py.py" -Raw
+          $requiredFields = @('temperature', 'weather', 'humidity', 'city')
+          foreach ($field in $requiredFields) {
+            if (-not ($content -match [regex]::Escape($field))) {
+              Write-Error "Error: Required field $field is missing in API response structure"
+              exit 1
+            }
+          }
+          Write-Host "Response structure verification passed"
+
+  test-server:
+    name: Test Server
+    needs: [validate-server, validate-frontend]
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Dependencies
+        run: |
+          if (Test-Path requirements.txt) {
+            pip install -r requirements.txt
+          }
+
+      - name: Start Server
+        shell: powershell
+        run: |
+          # Start server in background
+          Start-Process python -ArgumentList "expose_py.py" -NoNewWindow
+          Write-Host "Waiting for server to start..."
+          Start-Sleep -Seconds 10
+
+      - name: Test Server Connection
+        shell: powershell
+        run: |
+          try {
+            $response = Invoke-WebRequest -Uri "http://localhost:5001" -Method GET
+            if ($response.StatusCode -eq 200) {
+              Write-Host "Server is running correctly"
+            }
+          }
+          catch {
+            Write-Error "Server test failed: $_"
+            exit 1
+          }
+          finally {
+            Stop-Process -Name "python" -Force -ErrorAction SilentlyContinue
+          }
+
+  final-validation:
+    name: Final Validation
+    needs: [validate-frontend, verify-dependencies, validate-server, test-server]
+    runs-on: windows-latest
+    steps:
+      - name: Summary
+        run: |
+          echo "=== Weather Application Validation ==="
+          echo "✓ Frontend Files Validation"
+          echo "  - Form structure verified"
+          echo "  - Input fields verified"
+          echo "  - Response template verified"
+          echo "✓ Dependencies Verification"
+          echo "  - Required modules checked"
+          echo "✓ Server Configuration"
+          echo "  - API key configuration verified"
+          echo "  - Response structure validated"
+          echo "✓ Server Testing"
+          echo "  - Server startup verified"
+          echo "  - Endpoint accessibility confirmed"
+          echo "All tests completed successfully"
