@@ -58,7 +58,6 @@ jobs:
           }
           
           $content = Get-Content "reponse.html" -Raw
-          
           # Check required template variables
           $requiredVars = @('{{city}}', '{{temperature}}', '{{weather}}', '{{humidity}}')
           foreach ($var in $requiredVars) {
